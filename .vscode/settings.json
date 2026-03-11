@@ -1,0 +1,11 @@
+{
+  "editor.tabSize": 2,
+  "css.lint.unknownAtRules": "ignore",
+  "json.schemaDownload.enable": true,
+  "json.schemas": [
+    {
+      "fileMatch": ["components.json"],
+      "url": "https://ui.shadcn.com/schema.json"
+    }
+  ]
+}
