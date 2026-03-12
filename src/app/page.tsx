@@ -66,21 +66,18 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [weather, setWeather] = useState<Weather | null>(null);
 
-  const {
-    searching: dbSearching,
-  } = useDebounceSearch(input, setWeather);
-  const {
-    searching: rgSearching,
-    handleSearch: handleRgSearch,
-  } = useRegularSearch(setWeather);
+  const { searching: dbSearching } = useDebounceSearch(input, setWeather);
+
+  const { searching: rgSearching, handleSearch: handleRgSearch } =
+    useRegularSearch(setWeather);
 
   const searching = dbSearching || rgSearching;
+
+  const [history, setHistory] = useState<Weather[]>([]);
 
   function handleSave() {
     if (weather !== null) setHistory([...history, weather]);
   }
-
-  const [history, setHistory] = useState<Weather[]>([]);
 
   function handleDelete(date: string) {
     setHistory(history.filter((weather) => weather.date !== date));
