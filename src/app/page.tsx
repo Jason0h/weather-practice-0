@@ -4,23 +4,26 @@ import { useEffect, useState } from "react";
 
 import { fetchWeather, type Weather } from "@/lib/api";
 
-const DEBOUNCE_DELAY = 500;
+function useDebounceSearch(input: string) {
+  const DEBOUNCE_DELAY = 500;
 
-export default function Home() {
-  const [input, setInput] = useState("");
   const [weather, setWeather] = useState<Weather | null>(null);
   const [searching, setSearching] = useState(false);
-
-  const [history, setHistory] = useState<Weather[]>([]);
+  const [timestamp, setTimestamp] = useState<Date | null>(null);
 
   useEffect(() => {
     if (input.trim() === "") return;
 
     let cancelled = false;
     const id = setTimeout(() => {
+      setSearching(true);
       fetchWeather(input)
         .then((weather) => {
-          if (!cancelled) setWeather(weather);
+          if (!cancelled) {
+            setWeather(weather);
+            setSearching(false);
+            setTimestamp(new Date());
+          }
         })
         .catch(() => {});
     }, DEBOUNCE_DELAY);
@@ -28,22 +31,70 @@ export default function Home() {
     return () => {
       clearTimeout(id);
       cancelled = true;
+      setSearching(false);
     };
   }, [input]);
 
-  async function handleSearch() {
-    console.log("hi there");
+  return { weather: weather, timestamp: timestamp, searching: searching };
+}
+
+function useRegularSearch() {
+  const [weather, setWeather] = useState<Weather | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [timestamp, setTimestamp] = useState<Date | null>(null);
+
+  async function handleSearch(input: string) {
     if (input.trim() === "") return;
-    setInput(""); // trigger effect return (cancel current render search)
     setSearching(true);
     const weather = await fetchWeather(input);
     setSearching(false);
     setWeather(weather);
+    setTimestamp(new Date());
   }
+
+  return {
+    weather: weather,
+    timestamp: timestamp,
+    searching: searching,
+    handleSearch: handleSearch,
+  };
+}
+
+export default function Home() {
+  const [input, setInput] = useState("");
+
+  const {
+    weather: dbWeather,
+    timestamp: dbTimestamp,
+    searching: dbSearching,
+  } = useDebounceSearch(input);
+  const {
+    weather: rgWeather,
+    timestamp: rgTimestamp,
+    searching: rgSearching,
+    handleSearch: handleRgSearch,
+  } = useRegularSearch();
+
+  let weather: Weather | null = null;
+  if (dbWeather === null && rgWeather === null) {
+    weather = null;
+  } else if (dbWeather === null) {
+    weather = rgWeather;
+  } else if (rgWeather === null) {
+    weather = dbWeather;
+  } else {
+    if (rgTimestamp !== null && dbTimestamp !== null) {
+      weather = rgTimestamp < dbTimestamp ? dbWeather : rgWeather;
+    }
+  }
+
+  const searching = dbSearching || rgSearching;
 
   function handleSave() {
     if (weather !== null) setHistory([...history, weather]);
   }
+
+  const [history, setHistory] = useState<Weather[]>([]);
 
   function handleDelete(date: string) {
     setHistory(history.filter((weather) => weather.date !== date));
@@ -82,12 +133,12 @@ export default function Home() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") void handleSearch();
+                if (e.key === "Enter") void handleRgSearch(input);
               }}
               className="flex-1 rounded-lg border border-gray-400 bg-gray-300 p-2 focus:border-blue-400 focus:outline-none"
             />
             <button
-              onClick={() => void handleSearch()}
+              onClick={() => void handleRgSearch(input)}
               className="w-24 rounded-lg bg-orange-300 p-2 text-center hover:bg-orange-400"
             >
               search
