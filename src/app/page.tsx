@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 import { fetchWeather, type Weather } from "@/lib/api";
 
@@ -43,13 +43,18 @@ function useRegularSearch() {
   const [searching, setSearching] = useState(false);
   const [timestamp, setTimestamp] = useState<Date | null>(null);
 
+  const currentSearch = useRef(0);
+
   async function handleSearch(input: string) {
     if (input.trim() === "") return;
+    const closedSearch = (currentSearch.current += 1);
     setSearching(true);
     const weather = await fetchWeather(input);
-    setSearching(false);
-    setWeather(weather);
-    setTimestamp(new Date());
+    if (closedSearch === currentSearch.current) {
+      setSearching(false);
+      setWeather(weather);
+      setTimestamp(new Date());
+    }
   }
 
   return {
