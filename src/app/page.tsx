@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useEffectEvent } from "react";
 
 import { fetchWeather, type Weather } from "@/lib/api";
 
-function useDebounceSearch(input: string) {
+function useDebounceSearch(
+  input: string,
+  setWeather: (weather: Weather) => void,
+) {
+  const ueeSetWeather = useEffectEvent(setWeather);
+
   const DEBOUNCE_DELAY = 500;
 
-  const [weather, setWeather] = useState<Weather | null>(null);
   const [searching, setSearching] = useState(false);
-  const [timestamp, setTimestamp] = useState<Date | null>(null);
 
   useEffect(() => {
     if (input.trim() === "") return;
@@ -20,9 +23,8 @@ function useDebounceSearch(input: string) {
       fetchWeather(input)
         .then((weather) => {
           if (!cancelled) {
-            setWeather(weather);
+            ueeSetWeather(weather);
             setSearching(false);
-            setTimestamp(new Date());
           }
         })
         .catch(() => {});
@@ -35,13 +37,11 @@ function useDebounceSearch(input: string) {
     };
   }, [input]);
 
-  return { weather: weather, timestamp: timestamp, searching: searching };
+  return { searching: searching };
 }
 
-function useRegularSearch() {
-  const [weather, setWeather] = useState<Weather | null>(null);
+function useRegularSearch(setWeather: (weather: Weather) => void) {
   const [searching, setSearching] = useState(false);
-  const [timestamp, setTimestamp] = useState<Date | null>(null);
 
   const currentSearch = useRef(0);
 
@@ -53,13 +53,10 @@ function useRegularSearch() {
     if (closedSearch === currentSearch.current) {
       setSearching(false);
       setWeather(weather);
-      setTimestamp(new Date());
     }
   }
 
   return {
-    weather: weather,
-    timestamp: timestamp,
     searching: searching,
     handleSearch: handleSearch,
   };
@@ -67,31 +64,15 @@ function useRegularSearch() {
 
 export default function Home() {
   const [input, setInput] = useState("");
+  const [weather, setWeather] = useState<Weather | null>(null);
 
   const {
-    weather: dbWeather,
-    timestamp: dbTimestamp,
     searching: dbSearching,
-  } = useDebounceSearch(input);
+  } = useDebounceSearch(input, setWeather);
   const {
-    weather: rgWeather,
-    timestamp: rgTimestamp,
     searching: rgSearching,
     handleSearch: handleRgSearch,
-  } = useRegularSearch();
-
-  let weather: Weather | null = null;
-  if (dbWeather === null && rgWeather === null) {
-    weather = null;
-  } else if (dbWeather === null) {
-    weather = rgWeather;
-  } else if (rgWeather === null) {
-    weather = dbWeather;
-  } else {
-    if (rgTimestamp !== null && dbTimestamp !== null) {
-      weather = rgTimestamp < dbTimestamp ? dbWeather : rgWeather;
-    }
-  }
+  } = useRegularSearch(setWeather);
 
   const searching = dbSearching || rgSearching;
 
