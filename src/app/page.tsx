@@ -4,9 +4,12 @@ import { useEffect, useState, useRef, useEffectEvent } from "react";
 
 import { fetchWeather, type Weather } from "@/lib/api";
 
+type IdWeather = { id: string; weather: Weather };
+type IdError = { id: string; error: Error };
+
 function useDebounceSearch(
   input: string,
-  setWeather: (weather: Weather) => void,
+  setWeather: (weather: Weather | Error) => void,
 ) {
   const ueeSetWeather = useEffectEvent(setWeather);
 
@@ -27,7 +30,14 @@ function useDebounceSearch(
             setSearching(false);
           }
         })
-        .catch(() => {});
+        .catch((error) => {
+          if (error instanceof Error) {
+            ueeSetWeather(error);
+          } else {
+            ueeSetWeather(new Error("Unknown Error"));
+          }
+          setSearching(false); // successful bug hunt!!!
+        });
     }, DEBOUNCE_DELAY);
 
     return () => {
@@ -40,7 +50,7 @@ function useDebounceSearch(
   return { searching: searching };
 }
 
-function useRegularSearch(setWeather: (weather: Weather) => void) {
+function useRegularSearch(setWeather: (weather: Weather | Error) => void) {
   const [searching, setSearching] = useState(false);
 
   const currentSearch = useRef(0);
@@ -49,9 +59,15 @@ function useRegularSearch(setWeather: (weather: Weather) => void) {
     if (input.trim() === "") return;
     const closedSearch = (currentSearch.current += 1);
     setSearching(true);
-    const weather = await fetchWeather(input);
+    let weather: Weather | Error;
+    try {
+      weather = await fetchWeather(input);
+    } catch (error) {
+      weather = error instanceof Error ? error : new Error("Unknown Error");
+    }
+
+    setSearching(false);
     if (closedSearch === currentSearch.current) {
-      setSearching(false);
       setWeather(weather);
     }
   }
@@ -64,7 +80,7 @@ function useRegularSearch(setWeather: (weather: Weather) => void) {
 
 export default function Home() {
   const [input, setInput] = useState("");
-  const [weather, setWeather] = useState<Weather | null>(null);
+  const [weather, setWeather] = useState<Weather | Error | null>(null);
 
   const { searching: dbSearching } = useDebounceSearch(input, setWeather);
 
@@ -73,26 +89,45 @@ export default function Home() {
 
   const searching = dbSearching || rgSearching;
 
-  const [history, setHistory] = useState<Weather[]>([]);
+  const [history, setHistory] = useState<(IdWeather | IdError)[]>([]);
 
   function handleSave() {
-    if (weather !== null) setHistory([...history, weather]);
+    if (weather !== null && !(weather instanceof Error))
+      setHistory([...history, { id: crypto.randomUUID(), weather: weather }]);
   }
 
-  function handleDelete(date: string) {
-    setHistory(history.filter((weather) => weather.date !== date));
+  function handleDelete(id: string) {
+    setHistory(history.filter((weather) => weather.id !== id));
   }
 
-  async function handleReload(date: string) {
-    const cityName = history.find((weather) => weather.date === date)?.cityName;
+  // function is a piece of shit: error should have city info on it too. this suffices for now
+  async function handleReload(id: string) {
+    const find = history.find((weather) => weather.id === id);
+    const cityName =
+      find && "weather" in find ? find.weather.cityName : undefined;
+
     if (cityName !== undefined) {
-      const newWeather = await fetchWeather(cityName);
+      let idNewWeather: IdWeather | IdError;
+      try {
+        const weather = await fetchWeather(cityName);
+        idNewWeather = { id: crypto.randomUUID(), weather: weather };
+      } catch (error) {
+        const weather =
+          error instanceof Error ? error : new Error("Unknown Error");
+        idNewWeather = { id: crypto.randomUUID(), error: weather };
+      }
+
       setHistory(
-        history.map((weather) =>
-          weather.date === date ? newWeather : weather,
-        ),
+        history.map((weather) => (weather.id === id ? idNewWeather : weather)),
       );
     }
+  }
+
+  function getSearchResult(): string {
+    if (searching) return "Searching";
+    if (weather === null) return "No Search Result";
+    if (weather instanceof Error) return "Search Error";
+    return `City: ${weather.cityName}. Temp: ${weather.temperature}. Date: ${weather.date}`;
   }
 
   return (
@@ -129,11 +164,7 @@ export default function Home() {
           </div>
           <div className="flex items-center justify-between gap-2">
             <div data-id="result" className="flex-1 rounded-lg bg-gray-400 p-2">
-              {searching
-                ? "Searching"
-                : weather === null
-                  ? "No Search Result"
-                  : `City: ${weather.cityName}. Temp: ${weather.temperature}. Date: ${weather.date}`}
+              {getSearchResult()}
             </div>
             <div
               onClick={handleSave}
@@ -150,18 +181,20 @@ export default function Home() {
           <div className="flex flex-col gap-2">
             {history.map((weather) => {
               return (
-                <div key={weather.date} className="flex gap-2">
+                <div key={weather.id} className="flex gap-2">
                   <div className="flex-1 rounded-lg bg-gray-400 p-2">
-                    {`City: ${weather.cityName}. Temp: ${weather.temperature}. Date: ${weather.date}`}
+                    {"weather" in weather
+                      ? `City: ${weather.weather.cityName}. Temp: ${weather.weather.temperature}. Date: ${weather.weather.date}`
+                      : weather.error.message}
                   </div>
                   <div
-                    onClick={() => void handleReload(weather.date)}
+                    onClick={() => void handleReload(weather.id)}
                     className="min-w-24 rounded-lg bg-orange-300 p-2 text-center hover:bg-orange-400"
                   >
                     reload
                   </div>
                   <div
-                    onClick={() => handleDelete(weather.date)}
+                    onClick={() => handleDelete(weather.id)}
                     className="min-w-24 rounded-lg bg-orange-300 p-2 text-center hover:bg-orange-400"
                   >
                     delete

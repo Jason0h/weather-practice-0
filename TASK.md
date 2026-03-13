@@ -7,10 +7,10 @@
 - [x] Save result to history
 - [x] Delete from history
 - [x] Reload a history item with fresh data
+- [x] Error handling
 
 ## Next
 
-- [ ] **Error handling** — show an error message if fetchWeather fails (simulate with a random failure in api.ts)
 - [ ] **Loading state per history item** — show a spinner on the reload button while that specific item is reloading
 - [ ] **Prevent duplicate saves** — disable or warn if the same city is already in history
 - [ ] **Sort history** — add buttons to sort history by city name or by date
