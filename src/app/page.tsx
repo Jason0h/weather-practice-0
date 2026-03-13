@@ -1,3 +1,5 @@
+// Lesson: Typing makes refactoring & progressive building so much easier
+
 "use client";
 
 import { useEffect, useState, useRef, useEffectEvent } from "react";
