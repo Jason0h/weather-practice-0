@@ -1,4 +1,5 @@
 // Lesson: Typing makes refactoring & progressive building so much easier
+// Idiomatic Refactoring Style: (a) hooks & subcomponents on top (b) export default on bottom
 
 "use client";
 
